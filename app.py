@@ -63,7 +63,7 @@ if st.session_state.menu_kapat:
     st.session_state.menu_kapat = False
 
 # --- PDF ÜRETİM FONKSİYONU ---
-def generate_pdf_file(hisse, veri_dict, fig):
+def generate_pdf_file(hisse, veri_dict):
     pdf = FPDF()
     pdf.add_page()
     
@@ -117,15 +117,6 @@ def generate_pdf_file(hisse, veri_dict, fig):
             
     pdf.ln(5)
     
-    # Grafiğin bölünmesini engelle
-    if pdf.get_y() > 150:
-        pdf.add_page()
-        
-    pdf.set_text_color(0, 0, 0)
-    pdf.set_font("Arial", 'B', 14)
-    pdf.cell(0, 10, "2. Algorithmic Price Action (6 Months)", ln=1)
-    
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_img: img_path = tmp_img.name
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_pdf: pdf_path = tmp_pdf.name
         
     # Sözlük ve Yasal Uyarı Sayfası
@@ -166,7 +157,7 @@ def generate_pdf_file(hisse, veri_dict, fig):
         
     pdf.output(pdf_path)
     with open(pdf_path, "rb") as f: pdf_bytes = f.read()
-    try: os.remove(img_path); os.remove(pdf_path)
+    try: os.remove(pdf_path)
     except: pass
     return pdf_bytes
 
@@ -230,7 +221,7 @@ eksik_verileri_goster = st.sidebar.checkbox("Allow Missing Data (N/A)", value=Tr
 with st.sidebar.form(key='screener_form'):
     st.form_submit_button(label='🚀 RUN SCREENER', use_container_width=True, on_click=taramayi_baslat)
 
-# --- YENİ EKLENEN YASAL UYARI (DISCLAIMER) ---
+# --- YASAL UYARI (DISCLAIMER) ---
 st.sidebar.markdown("<br><br>", unsafe_allow_html=True)
 st.sidebar.markdown("""
     <div style='font-size: 0.75rem; color: #787B86; text-align: justify; padding: 10px; background-color: #131722; border-radius: 5px;'>
@@ -332,7 +323,6 @@ if not st.session_state.tarama_yapildi:
     st.markdown("<h3 style='color: #D1D4DC;'>Market Overview</h3>", unsafe_allow_html=True)
     st.info("👈 Set your filters on the left panel and click 'RUN SCREENER' to start analysis.")
     
-    # Grafiği ve yorumu çizen tekrar kullanılabilir fonksiyon
     def render_dashboard(df, title):
         if df is None or df.empty or len(df) < 2:
             st.warning(f"⚠️ Yahoo Finance API currently does not provide stable data for '{title}'. Data provider limitation.")
@@ -377,7 +367,6 @@ if not st.session_state.tarama_yapildi:
         st.plotly_chart(fig_idx, use_container_width=True)
 
     with st.spinner("Loading live market data..."):
-        # Veri çekme işlemlerini İZOLE ediyoruz
         def safe_get_data(ticker):
             try:
                 df = yf.Ticker(ticker).history(period="6mo")
@@ -385,7 +374,6 @@ if not st.session_state.tarama_yapildi:
             except:
                 return pd.DataFrame()
 
-        # En stabil global ticker'lar
         xu100 = safe_get_data("XU100.IS")
         xu030 = safe_get_data("XU030.IS")
             
@@ -489,7 +477,7 @@ else:
                     st.plotly_chart(fig, use_container_width=True)
                     
                     hisse_verisi = df_show[df_show["Ticker"] == secilen_grafik_hissesi].iloc[0].to_dict()
-                    pdf_bytes = generate_pdf_file(secilen_grafik_hissesi, hisse_verisi, fig)
+                    pdf_bytes = generate_pdf_file(secilen_grafik_hissesi, hisse_verisi)
                     st.download_button(
                         label=f"📥 Download Research Report ({secilen_grafik_hissesi})", data=pdf_bytes,
                         file_name=f"{secilen_grafik_hissesi}_Report.pdf", mime="application/pdf", type="primary"
