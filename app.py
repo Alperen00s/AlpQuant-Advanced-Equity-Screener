@@ -128,17 +128,6 @@ def generate_pdf_file(hisse, veri_dict, fig):
     with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_img: img_path = tmp_img.name
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_pdf: pdf_path = tmp_pdf.name
         
-    try:
-        fig_white = go.Figure(fig)
-        fig_white.update_layout(
-            template="plotly_white", paper_bgcolor="white", plot_bgcolor="white", font=dict(color="black")
-        )
-        fig_white.update_xaxes(showgrid=True, gridcolor='lightgray')
-        fig_white.update_yaxes(showgrid=True, gridcolor='lightgray')
-        fig_white.write_image(img_path, width=800, height=400) 
-        pdf.image(img_path, x=10, w=190)
-    except: pass
-    
     # Sözlük ve Yasal Uyarı Sayfası
     pdf.add_page()
     pdf.set_text_color(0, 0, 0)
