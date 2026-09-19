@@ -1,0 +1,22 @@
+# Python önbellek dosyaları
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Sanal ortam (Virtual Environment)
+venv/
+env/
+.venv/
+
+# macOS sistem dosyaları
+.DS_Store
+
+# VS Code ayarları
+.vscode/
+
+# Streamlit gizli dosyaları (Eğer ileride API key vs. eklersen)
+.streamlit/secrets.toml
+
+# Yerel testler sırasında oluşabilecek geçici raporlar ve görseller
+*.pdf
+*.png
