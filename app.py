@@ -12,15 +12,12 @@ import tempfile
 import matplotlib.pyplot as plt
 from fpdf import FPDF
 
-# 1. Gerçek bir tarayıcı (Google Chrome / Mac) kimliği oluşturuyoruz
+# 1. Gerçek bir tarayıcı (Google Chrome / Mac) kimliği oluşturuyoruz (Kimlik Gizleme)
 session = requests.Session()
 session.headers.update({
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 })
-
-# 2. yfinance kütüphanesine, verileri çekerken bu sahte kimliği kullanmasını söylüyoruz
-yf.set_cookie(None) # Eski bozuk çerezleri sıfırla
-
+# NOT: yf.set_cookie(None) komutu çökme yaptığı için kaldırıldı. Sadece session kullanmak yeterlidir.
 
 # --- 1. SAYFA AYARLARI VE CSS ---
 st.set_page_config(page_title="AlpQuant | Financial Terminal", page_icon="📊", layout="wide", initial_sidebar_state="expanded")
@@ -138,7 +135,8 @@ def generate_pdf_file(hisse, veri_dict):
     
     img_path = None
     try:
-        hist_data = hisse = yf.Ticker("THYAO.IS", session=session).history(period="6mo")
+        # THYAO Kopyala Yapıştır Hatası Düzeltildi
+        hist_data = yf.Ticker(f"{hisse}.IS", session=session).history(period="6mo")
         if not hist_data.empty:
             plt.figure(figsize=(10, 4))
             plt.plot(hist_data.index, hist_data['Close'], color='#2962FF', linewidth=1.5)
@@ -270,7 +268,7 @@ st.sidebar.markdown("<br>", unsafe_allow_html=True)
 eksik_verileri_goster = st.sidebar.checkbox("Allow Missing Data (N/A)", value=True)
 
 with st.sidebar.form(key='screener_form'):
-    st.form_submit_button(label='🚀 RUN SCREENER', use_container_width=True, on_click=taramayi_baslat)
+    st.form_submit_button(label='🚀 RUN SCREENER', on_click=taramayi_baslat)
 
 # --- YASAL UYARI (DISCLAIMER) ---
 st.sidebar.markdown("<br><br>", unsafe_allow_html=True)
@@ -302,7 +300,8 @@ def verileri_hazirla_paralel(hisseler):
             if hisse in sek_list: grup = sek_isim; break
             
         try:
-            ticker_obj = hisse = yf.Ticker("THYAO.IS", session=session)
+            # THYAO Kopyala Yapıştır Hatası Düzeltildi
+            ticker_obj = yf.Ticker(f"{hisse}.IS", session=session)
             info_full = ticker_obj.info
             guncel_fiyat = info_full.get('currentPrice', info_full.get('regularMarketPrice', 0))
             if guncel_fiyat == 0:
@@ -420,7 +419,8 @@ if not st.session_state.tarama_yapildi:
     with st.spinner("Loading live market data..."):
         def safe_get_data(ticker):
             try:
-                df = hisse = yf.Ticker("THYAO.IS", session=session).history(period="6mo")
+                # THYAO Kopyala Yapıştır Hatası Düzeltildi
+                df = yf.Ticker(ticker, session=session).history(period="6mo")
                 return df
             except:
                 return pd.DataFrame()
@@ -510,7 +510,8 @@ else:
         
         if secilen_grafik_hissesi:
             try:
-                hist_data = hisse = yf.Ticker("THYAO.IS", session=session).history(period="6mo")
+                # THYAO Kopyala Yapıştır Hatası Düzeltildi
+                hist_data = yf.Ticker(f"{secilen_grafik_hissesi}.IS", session=session).history(period="6mo")
                 if not hist_data.empty:
                     fig = go.Figure(data=[go.Candlestick(
                         x=hist_data.index, open=hist_data['Open'], high=hist_data['High'],
