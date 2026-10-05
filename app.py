@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import yfinance as yf
-import requests
 import datetime
 import io
 import concurrent.futures
@@ -11,15 +10,6 @@ import os
 import tempfile
 import matplotlib.pyplot as plt
 from fpdf import FPDF
-
-# 1. Gerçek bir tarayıcı (Google Chrome / Mac) kimliği oluşturuyoruz (Hisseler için Kalkan)
-session = requests.Session()
-session.headers.update({
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Accept": "*/*",
-    "Accept-Encoding": "gzip, deflate, br",
-    "Connection": "keep-alive"
-})
 
 # --- 1. SAYFA AYARLARI VE CSS ---
 st.set_page_config(page_title="AlpQuant | Financial Terminal", page_icon="📊", layout="wide", initial_sidebar_state="expanded")
@@ -72,7 +62,7 @@ if st.session_state.menu_kapat:
     """, unsafe_allow_html=True)
     st.session_state.menu_kapat = False
 
-# --- 1. PDF ÜRETİM FONKSİYONU ---
+# --- PDF ÜRETİM FONKSİYONU ---
 def generate_pdf_file(hisse, veri_dict):
     pdf = FPDF()
     pdf.add_page()
@@ -133,7 +123,8 @@ def generate_pdf_file(hisse, veri_dict):
     
     img_path = None
     try:
-        hist_data = yf.Ticker(f"{hisse}.IS", session=session).history(period="6mo")
+        # SAF YFINANCE KULLANIMI
+        hist_data = yf.Ticker(f"{hisse}.IS").history(period="6mo")
         if not hist_data.empty:
             plt.figure(figsize=(10, 4))
             plt.plot(hist_data.index, hist_data['Close'], color='#2962FF', linewidth=1.5)
@@ -206,7 +197,7 @@ def generate_pdf_file(hisse, veri_dict):
         
     return pdf_bytes
 
-# --- 2. LİSTELER VE SÖZLÜKLER ---
+# --- LİSTELER VE SÖZLÜKLER ---
 bist_30 = ["AKBNK", "ALARK", "ARCLK", "ASELS", "ASTOR", "BIMAS", "DOAS", "EKGYO", "ENKAI", "EREGL", "FROTO", "GARAN", "GUBRF", "HEKTS", "ISCTR", "KCHOL", "KOZAA", "KOZAL", "KRDMD", "ODAS", "PETKM", "PGSUS", "SAHOL", "SASA", "SISE", "TCELL", "THYAO", "TOASO", "TUPRS", "YKBNK"]
 bankalar = ["AKBNK", "GARAN", "YKBNK", "ISCTR", "ALBRK", "VAKBN", "HALKB", "TSKB", "SKBNK"]
 holdingler = ["KCHOL", "SAHOL", "AGHOL", "ALARK", "DOHOL", "TKFEN", "ENKAI", "GOHOL"]
@@ -238,7 +229,7 @@ bist_100 = list(set(bist_100_ham + bist_30))
 katilim_30 = ["BIMAS", "THYAO", "ASELS", "FROTO", "TUPRS", "DOAS", "ENJSA", "ALBRK", "OYAKC", "EREGL", "ASTOR", "GESAN", "MIATK", "CWENE", "EUPWR", "ALFAS", "KCAER", "BRSAN", "CIMSA", "ARCLK", "LOGO", "SOKM", "HEKTS", "GWIND", "YUNSA", "TTRAK", "YEOTK", "SDTTR", "CVKMD", "KORDS"]
 katilim_tum = list(set(katilim_30 + ["KTLEV", "ALTNY", "SRVGY", "LKMNH", "DMLKT", "KAYSE", "FMIZP", "BRYAT", "BRLSM", "BUCIM", "TUKAS", "TATGD", "ARDYZ", "MOBTL", "VBTYZ", "BIZIM", "FADEL", "ELITE", "RTALB", "TRILC", "GENIL", "DEVA", "SASA", "GUBRF", "VAKFN", "KZBGY", "KLNMA", "INFO", "OSMEN", "TRGYO", "HLGYO", "VKGYO", "KMPUR", "SUWEN", "MTRKS", "PCILT", "KARYE", "NATEN", "MAGEN", "ESEN", "AGROT", "REEDR", "EBEBK", "OBAMS"]))
 
-# --- 3. PROFESYONEL SOL MENÜ ---
+# --- PROFESYONEL SOL MENÜ ---
 st.sidebar.markdown("<h3 style='text-align: center; color: #FFFFFF;'>Filters & Options</h3>", unsafe_allow_html=True)
 st.sidebar.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
 
@@ -273,7 +264,7 @@ st.sidebar.markdown("""
     </div>
 """, unsafe_allow_html=True) 
 
-# --- 4. VERİ MOTORU ---
+# --- VERİ MOTORU ---
 def verileri_hazirla_paralel(hisseler):
     if not hisseler: return pd.DataFrame()
     progress_bar = st.progress(0)
@@ -295,8 +286,10 @@ def verileri_hazirla_paralel(hisseler):
             if hisse in sek_list: grup = sek_isim; break
             
         try:
-            ticker_obj = yf.Ticker(f"{hisse}.IS", session=session)
+            # SAF YFINANCE KULLANIMI (THYAO hatası düzeltildi)
+            ticker_obj = yf.Ticker(f"{hisse}.IS")
             info_full = ticker_obj.info
+            
             guncel_fiyat = info_full.get('currentPrice', info_full.get('regularMarketPrice', 0))
             if guncel_fiyat == 0:
                 try: guncel_fiyat = ticker_obj.fast_info.last_price
@@ -337,7 +330,8 @@ def verileri_hazirla_paralel(hisseler):
                         bb_width_series = (((sma20 + (std20 * 2)) - (sma20 - (std20 * 2))) / sma20) * 100
                         if not bb_width_series.dropna().empty: bb_genislik = bb_width_series.dropna().iloc[-1]
             except: pass
-        except: pass 
+        except: 
+            pass 
         
         trend_durumu = "🚀 Up" if (sma_50 != 999.0 and sma_200 != 999.0 and sma_50 > sma_200) else "📉 Down"
         
@@ -350,13 +344,15 @@ def verileri_hazirla_paralel(hisseler):
             "Trend": trend_durumu, "SMA50": guvenli_deger_al(sma_50), "SMA200": guvenli_deger_al(sma_200)
         }
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-        gelecek_sonuclar = {executor.submit(tek_hisse_isle, h): h for h in hisseler}
+    # Gerçek veri taraması (Sadece Worker limitini 5'te tuttuk)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        gelecek_sonuclar = {executor.submit(tek_hisse_isle, h): h for h in hisseler} 
         for future in concurrent.futures.as_completed(gelecek_sonuclar):
             tamamlanan += 1
             progress_bar.progress(tamamlanan / toplam_hisse)
             try:
-                if (sonuc := future.result()) is not None: hesaplanan_veriler.append(sonuc)
+                sonuc = future.result()
+                if sonuc is not None: hesaplanan_veriler.append(sonuc)
             except: pass
 
     progress_bar.empty()
@@ -369,7 +365,7 @@ if not st.session_state.tarama_yapildi:
     
     def render_dashboard(df, title):
         if df is None or df.empty or len(df) < 2:
-            st.warning(f"⚠️ Yahoo Finance API currently does not provide stable data for '{title}'. Data provider limitation.")
+            st.warning(f"⚠️️ Yahoo Finance API currently does not provide stable data for '{title}'. Data provider limitation.")
             return
         
         last_price = df['Close'].iloc[-1]
@@ -413,17 +409,11 @@ if not st.session_state.tarama_yapildi:
     with st.spinner("Loading live market data..."):
         def safe_get_data(ticker):
             try:
-                # 1. Önce kalkansız normal deniyoruz (Endeksler kalkansız daha iyi çalışır)
+                # SAF YFINANCE KULLANIMI
                 df = yf.Ticker(ticker).history(period="6mo")
-                if df is None or df.empty:
-                    # 2. Eğer boş dönerse kalkanı takıp tekrar deniyoruz
-                    df = yf.Ticker(ticker, session=session).history(period="6mo")
                 return df
             except:
-                try:
-                    return yf.Ticker(ticker, session=session).history(period="6mo")
-                except:
-                    return pd.DataFrame()
+                return pd.DataFrame()
 
         xu100 = safe_get_data("XU100.IS")
         xu030 = safe_get_data("XU030.IS")
@@ -459,9 +449,7 @@ else:
         
         df_b = st.session_state.ham_veri.copy()
         
-        if df_b.empty:
-            st.error("🚨 Veri çekilemedi! Yahoo Finance engellemesi devam ediyor.")
-        else:
+        if not df_b.empty:
             for col in ['P/E', 'P/B', 'ROE%', 'Div Yield%', 'PEG', 'Beta', 'RSI', 'BBW%']:
                 df_b[col] = pd.to_numeric(df_b[col], errors='coerce')
             
@@ -513,7 +501,9 @@ else:
         
         if secilen_grafik_hissesi:
             try:
-                hist_data = yf.Ticker(f"{secilen_grafik_hissesi}.IS", session=session).history(period="6mo")
+                # SAF YFINANCE KULLANIMI
+                hist_data = yf.Ticker(f"{secilen_grafik_hissesi}.IS").history(period="6mo")
+
                 if not hist_data.empty:
                     fig = go.Figure(data=[go.Candlestick(
                         x=hist_data.index, open=hist_data['Open'], high=hist_data['High'],
@@ -538,9 +528,9 @@ else:
                     )
             except:
                 st.error("Chart loading error.")
-    elif st.session_state.tarama_yapildi and st.session_state.ham_veri.empty == False:
+    elif st.session_state.tarama_yapildi:
         st.markdown("<br><br>", unsafe_allow_html=True)
-        st.warning("⚠️ No stocks matched your strict criteria (e.g., Bullish MACD + Uptrend). Please loosen your filters and try again.")
+        st.warning("⚠️️ No stocks matched your criteria. Please loosen your filters and try again.")
         col_center = st.columns([4, 2, 4])
         with col_center[1]:
             st.button("⬅️ Back to Market", on_click=ana_ekrana_don, use_container_width=True)
