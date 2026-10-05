@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import yfinance as yf
-import requests
 import datetime
 import io
 import concurrent.futures
@@ -11,13 +10,6 @@ import os
 import tempfile
 import matplotlib.pyplot as plt
 from fpdf import FPDF
-
-# 1. Gerçek bir tarayıcı (Google Chrome / Mac) kimliği oluşturuyoruz (Kimlik Gizleme)
-session = requests.Session()
-session.headers.update({
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-})
-# NOT: yf.set_cookie(None) komutu çökme yaptığı için kaldırıldı. Sadece session kullanmak yeterlidir.
 
 # --- 1. SAYFA AYARLARI VE CSS ---
 st.set_page_config(page_title="AlpQuant | Financial Terminal", page_icon="📊", layout="wide", initial_sidebar_state="expanded")
@@ -71,7 +63,7 @@ if st.session_state.menu_kapat:
     """, unsafe_allow_html=True)
     st.session_state.menu_kapat = False
 
-# --- 1. PDF ÜRETİM FONKSİYONU (GRAFİKLİ VE SÖZLÜKLÜ NİHAİ VERSİYON) ---
+# --- 1. PDF ÜRETİM FONKSİYONU ---
 def generate_pdf_file(hisse, veri_dict):
     pdf = FPDF()
     pdf.add_page()
@@ -80,7 +72,6 @@ def generate_pdf_file(hisse, veri_dict):
         t = str(text).replace('ı','i').replace('ğ','g').replace('ü','u').replace('ş','s').replace('ö','o').replace('ç','c').replace('İ','I').replace('Ğ','G').replace('Ü','U').replace('Ş','S').replace('Ö','O').replace('Ç','C')
         return t.encode('latin-1', 'ignore').decode('latin-1')
 
-    # Başlık ve Şirket Bilgileri
     pdf.set_font("Arial", 'B', 22)
     pdf.set_text_color(41, 98, 255)
     pdf.cell(0, 12, tr2eng("AlpQuant - EQUITY RESEARCH REPORT"), ln=1, align='C')
@@ -90,7 +81,6 @@ def generate_pdf_file(hisse, veri_dict):
     pdf.line(10, 32, 200, 32)
     pdf.ln(8)
     
-    # 1. Finansal Metrikler
     pdf.set_text_color(0, 0, 0)
     pdf.set_font("Arial", 'B', 14)
     pdf.cell(0, 10, "1. Financial & Technical Analysis Profile", ln=1)
@@ -128,15 +118,13 @@ def generate_pdf_file(hisse, veri_dict):
             
     pdf.ln(5)
     
-    # 2. Algoritmik Fiyat Hareketi Grafiği (Matplotlib)
     pdf.set_text_color(0, 0, 0)
     pdf.set_font("Arial", 'B', 14)
     pdf.cell(0, 10, "2. Algorithmic Price Action (6 Months)", ln=1)
     
     img_path = None
     try:
-        # THYAO Kopyala Yapıştır Hatası Düzeltildi
-        hist_data = yf.Ticker(f"{hisse}.IS", session=session).history(period="6mo")
+        hist_data = yf.Ticker(f"{hisse}.IS").history(period="6mo")
         if not hist_data.empty:
             plt.figure(figsize=(10, 4))
             plt.plot(hist_data.index, hist_data['Close'], color='#2962FF', linewidth=1.5)
@@ -159,7 +147,6 @@ def generate_pdf_file(hisse, veri_dict):
         pdf.set_text_color(150, 150, 150)
         pdf.cell(0, 10, "(Chart data currently unavailable)", ln=1)
 
-    # --- SÖZLÜK VE YASAL UYARI KISMI (GERİ EKLENDİ) ---
     pdf.add_page()
     pdf.set_text_color(0, 0, 0)
     pdf.set_font("Arial", 'B', 14)
@@ -270,7 +257,6 @@ eksik_verileri_goster = st.sidebar.checkbox("Allow Missing Data (N/A)", value=Tr
 with st.sidebar.form(key='screener_form'):
     st.form_submit_button(label='🚀 RUN SCREENER', on_click=taramayi_baslat)
 
-# --- YASAL UYARI (DISCLAIMER) ---
 st.sidebar.markdown("<br><br>", unsafe_allow_html=True)
 st.sidebar.markdown("""
     <div style='font-size: 0.75rem; color: #787B86; text-align: justify; padding: 10px; background-color: #131722; border-radius: 5px;'>
@@ -300,8 +286,7 @@ def verileri_hazirla_paralel(hisseler):
             if hisse in sek_list: grup = sek_isim; break
             
         try:
-            # THYAO Kopyala Yapıştır Hatası Düzeltildi
-            ticker_obj = yf.Ticker(f"{hisse}.IS", session=session)
+            ticker_obj = yf.Ticker(f"{hisse}.IS")
             info_full = ticker_obj.info
             guncel_fiyat = info_full.get('currentPrice', info_full.get('regularMarketPrice', 0))
             if guncel_fiyat == 0:
@@ -419,8 +404,7 @@ if not st.session_state.tarama_yapildi:
     with st.spinner("Loading live market data..."):
         def safe_get_data(ticker):
             try:
-                # THYAO Kopyala Yapıştır Hatası Düzeltildi
-                df = yf.Ticker(ticker, session=session).history(period="6mo")
+                df = yf.Ticker(ticker).history(period="6mo")
                 return df
             except:
                 return pd.DataFrame()
@@ -510,8 +494,7 @@ else:
         
         if secilen_grafik_hissesi:
             try:
-                # THYAO Kopyala Yapıştır Hatası Düzeltildi
-                hist_data = yf.Ticker(f"{secilen_grafik_hissesi}.IS", session=session).history(period="6mo")
+                hist_data = yf.Ticker(f"{secilen_grafik_hissesi}.IS").history(period="6mo")
                 if not hist_data.empty:
                     fig = go.Figure(data=[go.Candlestick(
                         x=hist_data.index, open=hist_data['Open'], high=hist_data['High'],
