@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import yfinance as yf
+import requests
 import datetime
 import io
 import concurrent.futures
@@ -10,6 +11,15 @@ import os
 import tempfile
 import matplotlib.pyplot as plt
 from fpdf import FPDF
+
+# 1. Gerçek bir tarayıcı (Google Chrome / Mac) kimliği oluşturuyoruz (Kimlik Gizleme)
+session = requests.Session()
+session.headers.update({
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Accept": "*/*",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Connection": "keep-alive"
+})
 
 # --- 1. SAYFA AYARLARI VE CSS ---
 st.set_page_config(page_title="AlpQuant | Financial Terminal", page_icon="📊", layout="wide", initial_sidebar_state="expanded")
@@ -51,6 +61,7 @@ def ana_ekrana_don():
     st.session_state.tarama_yapildi = False
     st.session_state.analiz_sonucu = pd.DataFrame()
 
+# Javascript ile sol menüyü otomatik daraltma
 if st.session_state.menu_kapat:
     st.markdown("""
         <script>
@@ -66,6 +77,7 @@ if st.session_state.menu_kapat:
 def generate_pdf_file(hisse, veri_dict):
     pdf = FPDF()
     pdf.add_page()
+    
     def tr2eng(text):
         t = str(text).replace('ı','i').replace('ğ','g').replace('ü','u').replace('ş','s').replace('ö','o').replace('ç','c').replace('İ','I').replace('Ğ','G').replace('Ü','U').replace('Ş','S').replace('Ö','O').replace('Ç','C')
         return t.encode('latin-1', 'ignore').decode('latin-1')
@@ -122,7 +134,8 @@ def generate_pdf_file(hisse, veri_dict):
     
     img_path = None
     try:
-        hist_data = yf.Ticker(f"{hisse}.IS").history(period="6mo")
+        # KALKAN BURAYA EKLENDİ
+        hist_data = yf.Ticker(f"{hisse}.IS", session=session).history(period="6mo")
         if not hist_data.empty:
             plt.figure(figsize=(10, 4))
             plt.plot(hist_data.index, hist_data['Close'], color='#2962FF', linewidth=1.5)
@@ -284,7 +297,8 @@ def verileri_hazirla_paralel(hisseler):
             if hisse in sek_list: grup = sek_isim; break
             
         try:
-            ticker_obj = yf.Ticker(f"{hisse}.IS")
+            # KALKAN ASIL FİLTRELEME MOTORUNA EKLENDİ!
+            ticker_obj = yf.Ticker(f"{hisse}.IS", session=session)
             info_full = ticker_obj.info
             guncel_fiyat = info_full.get('currentPrice', info_full.get('regularMarketPrice', 0))
             if guncel_fiyat == 0:
@@ -339,7 +353,8 @@ def verileri_hazirla_paralel(hisseler):
             "Trend": trend_durumu, "SMA50": guvenli_deger_al(sma_50), "SMA200": guvenli_deger_al(sma_200)
         }
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+    # Worker sayısını azaltarak rate limit yeme riskini düşürdük
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
         gelecek_sonuclar = {executor.submit(tek_hisse_isle, h): h for h in hisseler}
         for future in concurrent.futures.as_completed(gelecek_sonuclar):
             tamamlanan += 1
@@ -402,7 +417,8 @@ if not st.session_state.tarama_yapildi:
     with st.spinner("Loading live market data..."):
         def safe_get_data(ticker):
             try:
-                df = yf.Ticker(ticker).history(period="6mo")
+                # KALKAN BURAYA DA EKLENDİ
+                df = yf.Ticker(ticker, session=session).history(period="6mo")
                 return df
             except:
                 return pd.DataFrame()
@@ -440,7 +456,11 @@ else:
                 st.session_state.son_aranan_hisseler = aktif_hisseler
         
         df_b = st.session_state.ham_veri.copy()
-        if not df_b.empty:
+        
+        # Filtreleme Öncesi Hata Ayıklama Paneli (Debug Mode)
+        if df_b.empty:
+            st.error("🚨 Veri çekilemedi! Yahoo Finance, uygulamanızın filtreleme motorunu engelledi.")
+        else:
             for col in ['P/E', 'P/B', 'ROE%', 'Div Yield%', 'PEG', 'Beta', 'RSI', 'BBW%']:
                 df_b[col] = pd.to_numeric(df_b[col], errors='coerce')
             
@@ -492,7 +512,8 @@ else:
         
         if secilen_grafik_hissesi:
             try:
-                hist_data = yf.Ticker(f"{secilen_grafik_hissesi}.IS").history(period="6mo")
+                # KALKAN BURAYA DA EKLENDİ
+                hist_data = yf.Ticker(f"{secilen_grafik_hissesi}.IS", session=session).history(period="6mo")
                 if not hist_data.empty:
                     fig = go.Figure(data=[go.Candlestick(
                         x=hist_data.index, open=hist_data['Open'], high=hist_data['High'],
