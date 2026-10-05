@@ -1,7 +1,6 @@
 streamlit
 pandas
-yfinance>=0.2.40
+yfinance>=0.2.44
 plotly
 fpdf
-numpy
 matplotlib
