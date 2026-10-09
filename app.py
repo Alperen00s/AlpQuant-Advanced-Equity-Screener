@@ -1,9 +1,8 @@
 import streamlit as st
 import pandas as pd
 import yfinance as yf
+import requests
 import datetime
-import io
-import concurrent.futures
 import plotly.graph_objects as go
 import numpy as np
 import os
@@ -62,7 +61,7 @@ if st.session_state.menu_kapat:
     """, unsafe_allow_html=True)
     st.session_state.menu_kapat = False
 
-# --- PDF ÜRETİM FONKSİYONU ---
+# --- 2. PDF ÜRETİM FONKSİYONU (GRAFİKLER YAHOO'DAN, SORUNSUZ) ---
 def generate_pdf_file(hisse, veri_dict):
     pdf = FPDF()
     pdf.add_page()
@@ -123,7 +122,6 @@ def generate_pdf_file(hisse, veri_dict):
     
     img_path = None
     try:
-        # SAF YFINANCE KULLANIMI
         hist_data = yf.Ticker(f"{hisse}.IS").history(period="6mo")
         if not hist_data.empty:
             plt.figure(figsize=(10, 4))
@@ -197,7 +195,7 @@ def generate_pdf_file(hisse, veri_dict):
         
     return pdf_bytes
 
-# --- LİSTELER VE SÖZLÜKLER ---
+# --- 3. LİSTELER VE SÖZLÜKLER ---
 bist_30 = ["AKBNK", "ALARK", "ARCLK", "ASELS", "ASTOR", "BIMAS", "DOAS", "EKGYO", "ENKAI", "EREGL", "FROTO", "GARAN", "GUBRF", "HEKTS", "ISCTR", "KCHOL", "KOZAA", "KOZAL", "KRDMD", "ODAS", "PETKM", "PGSUS", "SAHOL", "SASA", "SISE", "TCELL", "THYAO", "TOASO", "TUPRS", "YKBNK"]
 bankalar = ["AKBNK", "GARAN", "YKBNK", "ISCTR", "ALBRK", "VAKBN", "HALKB", "TSKB", "SKBNK"]
 holdingler = ["KCHOL", "SAHOL", "AGHOL", "ALARK", "DOHOL", "TKFEN", "ENKAI", "GOHOL"]
@@ -226,10 +224,9 @@ bist_100_ham = []
 for liste in sektor_sozlugu.values(): bist_100_ham.extend(liste)
 bist_100 = list(set(bist_100_ham + bist_30))
 
-katilim_30 = ["BIMAS", "THYAO", "ASELS", "FROTO", "TUPRS", "DOAS", "ENJSA", "ALBRK", "OYAKC", "EREGL", "ASTOR", "GESAN", "MIATK", "CWENE", "EUPWR", "ALFAS", "KCAER", "BRSAN", "CIMSA", "ARCLK", "LOGO", "SOKM", "HEKTS", "GWIND", "YUNSA", "TTRAK", "YEOTK", "SDTTR", "CVKMD", "KORDS"]
-katilim_tum = list(set(katilim_30 + ["KTLEV", "ALTNY", "SRVGY", "LKMNH", "DMLKT", "KAYSE", "FMIZP", "BRYAT", "BRLSM", "BUCIM", "TUKAS", "TATGD", "ARDYZ", "MOBTL", "VBTYZ", "BIZIM", "FADEL", "ELITE", "RTALB", "TRILC", "GENIL", "DEVA", "SASA", "GUBRF", "VAKFN", "KZBGY", "KLNMA", "INFO", "OSMEN", "TRGYO", "HLGYO", "VKGYO", "KMPUR", "SUWEN", "MTRKS", "PCILT", "KARYE", "NATEN", "MAGEN", "ESEN", "AGROT", "REEDR", "EBEBK", "OBAMS"]))
+katilim_tum = list(set(["BIMAS", "THYAO", "ASELS", "FROTO", "TUPRS", "DOAS", "ENJSA", "ALBRK", "OYAKC", "EREGL", "ASTOR", "GESAN", "MIATK", "CWENE", "EUPWR", "ALFAS", "KCAER", "BRSAN", "CIMSA", "ARCLK", "LOGO", "SOKM", "HEKTS", "GWIND", "YUNSA", "TTRAK", "YEOTK", "SDTTR", "CVKMD", "KORDS", "KTLEV", "ALTNY", "SRVGY", "LKMNH", "DMLKT", "KAYSE", "FMIZP", "BRYAT", "BRLSM", "BUCIM", "TUKAS", "TATGD", "ARDYZ", "MOBTL", "VBTYZ", "BIZIM", "FADEL", "ELITE", "RTALB", "TRILC", "GENIL", "DEVA", "SASA", "GUBRF", "VAKFN", "KZBGY", "KLNMA", "INFO", "OSMEN", "TRGYO", "HLGYO", "VKGYO", "KMPUR", "SUWEN", "MTRKS", "PCILT", "KARYE", "NATEN", "MAGEN", "ESEN", "AGROT", "REEDR", "EBEBK", "OBAMS"]))
 
-# --- PROFESYONEL SOL MENÜ ---
+# --- 4. PROFESYONEL SOL MENÜ ---
 st.sidebar.markdown("<h3 style='text-align: center; color: #FFFFFF;'>Filters & Options</h3>", unsafe_allow_html=True)
 st.sidebar.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
 
@@ -264,108 +261,95 @@ st.sidebar.markdown("""
     </div>
 """, unsafe_allow_html=True) 
 
-# --- VERİ MOTORU ---
+# --- 5. YENİ VERİ MOTORU: TRADINGVIEW API (IŞIK HIZINDA, SIFIR BAN) ---
 def verileri_hazirla_paralel(hisseler):
     if not hisseler: return pd.DataFrame()
-    progress_bar = st.progress(0)
-    hesaplanan_veriler, tamamlanan, toplam_hisse = [], 0, len(hisseler)
     
-    def guvenli_deger_al(deger):
-        try:
-            if deger is None or deger == 999.0 or deger == "" or pd.isna(deger): return "N/A"
-            return round(float(deger), 2)
-        except: return "N/A"
+    st.toast("⚡ TradingView Kurumsal API'sine bağlanılıyor...", icon="🔌")
+    
+    url = "https://scanner.tradingview.com/turkey/scan"
+    payload = {
+        "symbols": {"query": {"types": ["stock"]}},
+        "columns": [
+            "name", "close", "price_earnings_ttm", "price_book_ratio", 
+            "ReturnOnEquityTTM", "dividend_yield_recent", "beta_1_year", 
+            "RSI", "MACD.macd", "MACD.signal", "SMA50", "SMA200", "BB.upper", "BB.lower"
+        ]
+    }
+    
+    try:
+        response = requests.post(url, json=payload, timeout=10)
+        tv_data = response.json().get("data", [])
+    except:
+        st.error("🚨 TradingView sunucularına ulaşılamadı.")
+        return pd.DataFrame()
 
-    def tek_hisse_isle(hisse):
-        guncel_fiyat, fk_orani, pddd_orani, roe_orani = 0, 999.0, 999.0, 0.0
-        sma_50, sma_200, rsi_14, temettu_verimi, peg_rasyosu, beta_katsayisi = 999.0, 999.0, 999.0, 0.0, 999.0, 999.0
-        macd_sinyal, bb_genislik = "N/A", 999.0
+    tv_dict = {}
+    for item in tv_data:
+        ticker = item["s"].replace("BIST:", "")
+        tv_dict[ticker] = item["d"]
+        
+    hesaplanan_veriler = []
+    
+    def safe_val(val):
+        return round(float(val), 2) if val is not None else "N/A"
+
+    for hisse in hisseler:
+        if hisse not in tv_dict:
+            continue
+            
+        d = tv_dict[hisse]
+        # TradingView Sütun Haritası
+        # 0:name, 1:close, 2:P/E, 3:P/B, 4:ROE, 5:DivYield, 6:Beta, 7:RSI, 8:MACD, 9:MACD.Signal, 10:SMA50, 11:SMA200, 12:BB.upper, 13:BB.lower
         
         grup = "Other"
         for sek_isim, sek_list in sektor_sozlugu.items():
             if hisse in sek_list: grup = sek_isim; break
-            
-        try:
-            # SAF YFINANCE KULLANIMI (THYAO hatası düzeltildi)
-            ticker_obj = yf.Ticker(f"{hisse}.IS")
-            info_full = ticker_obj.info
-            
-            guncel_fiyat = info_full.get('currentPrice', info_full.get('regularMarketPrice', 0))
-            if guncel_fiyat == 0:
-                try: guncel_fiyat = ticker_obj.fast_info.last_price
-                except: pass
-            
-            fk_orani = info_full.get('trailingPE', 999.0)
-            pddd_orani = info_full.get('priceToBook', 999.0)
-            raw_roe = info_full.get('returnOnEquity', None)
-            roe_orani = raw_roe * 100 if raw_roe is not None else 0.0
-            raw_div = info_full.get('dividendYield', None)
-            temettu_verimi = raw_div * 100 if raw_div is not None else 0.0
-            peg_rasyosu = info_full.get('pegRatio', info_full.get('trailingPegRatio', 999.0))
-            beta_katsayisi = info_full.get('beta', 999.0) 
-            sma_50 = info_full.get('fiftyDayAverage', 999.0)
-            sma_200 = info_full.get('twoHundredDayAverage', 999.0)
 
-            try:
-                hist = ticker_obj.history(period="6mo")
-                if not hist.empty:
-                    close_px = hist['Close'].dropna() 
-                    if len(close_px) > 30:
-                        delta = close_px.diff()
-                        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-                        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-                        rs = gain / loss
-                        rsi_series = 100 - (100 / (1 + rs))
-                        if not rsi_series.dropna().empty: rsi_14 = rsi_series.dropna().iloc[-1]
-
-                        ema12 = close_px.ewm(span=12, adjust=False).mean()
-                        ema26 = close_px.ewm(span=26, adjust=False).mean()
-                        macd_line = ema12 - ema26
-                        signal_line = macd_line.ewm(span=9, adjust=False).mean()
-                        macd_hist = macd_line - signal_line
-                        if not macd_hist.dropna().empty: macd_sinyal = "🟢 Bull" if macd_hist.dropna().iloc[-1] > 0 else "🔴 Bear"
-
-                        sma20 = close_px.rolling(window=20).mean()
-                        std20 = close_px.rolling(window=20).std()
-                        bb_width_series = (((sma20 + (std20 * 2)) - (sma20 - (std20 * 2))) / sma20) * 100
-                        if not bb_width_series.dropna().empty: bb_genislik = bb_width_series.dropna().iloc[-1]
-            except: pass
-        except: 
-            pass 
+        # MACD ve Trend Hesaplamaları
+        macd_val, signal_val = d[8], d[9]
+        macd_sinyal = "N/A"
+        if macd_val is not None and signal_val is not None:
+            macd_sinyal = "🟢 Bull" if macd_val > signal_val else "🔴 Bear"
+            
+        sma50_val, sma200_val = d[10], d[11]
+        trend_durumu = "N/A"
+        if sma50_val is not None and sma200_val is not None:
+            trend_durumu = "🚀 Up" if sma50_val > sma200_val else "📉 Down"
+            
+        bb_upper, bb_lower, close_price = d[12], d[13], d[1]
+        bb_genislik = "N/A"
+        if bb_upper is not None and bb_lower is not None and close_price is not None and close_price > 0:
+            bb_genislik = round(((bb_upper - bb_lower) / close_price) * 100, 2)
+            
+        hesaplanan_veriler.append({
+            "Ticker": hisse,
+            "Sector": grup,
+            "Price": safe_val(d[1]),
+            "P/E": safe_val(d[2]),
+            "P/B": safe_val(d[3]),
+            "PEG": "N/A", # TV ücretsiz API'sinde PEG yok, filtreden her zaman geçer.
+            "ROE%": safe_val(d[4]),
+            "Div Yield%": safe_val(d[5]),
+            "Beta": safe_val(d[6]),
+            "RSI": safe_val(d[7]),
+            "BBW%": bb_genislik,
+            "MACD": macd_sinyal, 
+            "Trend": trend_durumu, 
+            "SMA50": safe_val(d[10]), 
+            "SMA200": safe_val(d[11])
+        })
         
-        trend_durumu = "🚀 Up" if (sma_50 != 999.0 and sma_200 != 999.0 and sma_50 > sma_200) else "📉 Down"
-        
-        return {
-            "Ticker": hisse, "Sector": grup, "Price": guvenli_deger_al(guncel_fiyat),
-            "P/E": guvenli_deger_al(fk_orani), "P/B": guvenli_deger_al(pddd_orani), "PEG": guvenli_deger_al(peg_rasyosu),
-            "ROE%": guvenli_deger_al(roe_orani), "Div Yield%": guvenli_deger_al(temettu_verimi) if temettu_verimi != 0.0 else 0.0,
-            "Beta": guvenli_deger_al(beta_katsayisi),
-            "RSI": guvenli_deger_al(rsi_14), "BBW%": guvenli_deger_al(bb_genislik), "MACD": macd_sinyal, 
-            "Trend": trend_durumu, "SMA50": guvenli_deger_al(sma_50), "SMA200": guvenli_deger_al(sma_200)
-        }
+    return pd.DataFrame(hesaplanan_veriler)
 
-    # Gerçek veri taraması (Sadece Worker limitini 5'te tuttuk)
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-        gelecek_sonuclar = {executor.submit(tek_hisse_isle, h): h for h in hisseler} 
-        for future in concurrent.futures.as_completed(gelecek_sonuclar):
-            tamamlanan += 1
-            progress_bar.progress(tamamlanan / toplam_hisse)
-            try:
-                sonuc = future.result()
-                if sonuc is not None: hesaplanan_veriler.append(sonuc)
-            except: pass
-
-    progress_bar.empty()
-    return pd.DataFrame(hesaplanan_veriler) if hesaplanan_veriler else pd.DataFrame()
-
-# --- ANA EKRAN AKIŞI ---
+# --- 6. ANA EKRAN AKIŞI ---
 if not st.session_state.tarama_yapildi:
     st.markdown("<h3 style='color: #D1D4DC;'>Market Overview</h3>", unsafe_allow_html=True)
     st.info("👈 Set your filters on the left panel and click 'RUN SCREENER' to start analysis.")
     
     def render_dashboard(df, title):
         if df is None or df.empty or len(df) < 2:
-            st.warning(f"⚠️️ Yahoo Finance API currently does not provide stable data for '{title}'. Data provider limitation.")
+            st.warning(f"⚠️ Yahoo Finance API currently does not provide stable data for '{title}'. Data provider limitation.")
             return
         
         last_price = df['Close'].iloc[-1]
@@ -409,7 +393,7 @@ if not st.session_state.tarama_yapildi:
     with st.spinner("Loading live market data..."):
         def safe_get_data(ticker):
             try:
-                # SAF YFINANCE KULLANIMI
+                # Grafikler için Yahoo'nun BANLANMAYAN .history servisi kullanılıyor.
                 df = yf.Ticker(ticker).history(period="6mo")
                 return df
             except:
@@ -443,7 +427,7 @@ else:
         st.button("⬅️ Back to Market", on_click=ana_ekrana_don)
     else:
         if aktif_hisseler != st.session_state.son_aranan_hisseler or st.session_state.ham_veri.empty:
-            with st.spinner("Downloading Market Data..."):
+            with st.spinner("Fetching data from TradingView..."):
                 st.session_state.ham_veri = verileri_hazirla_paralel(aktif_hisseler)
                 st.session_state.son_aranan_hisseler = aktif_hisseler
         
@@ -501,7 +485,6 @@ else:
         
         if secilen_grafik_hissesi:
             try:
-                # SAF YFINANCE KULLANIMI
                 hist_data = yf.Ticker(f"{secilen_grafik_hissesi}.IS").history(period="6mo")
 
                 if not hist_data.empty:
@@ -530,7 +513,7 @@ else:
                 st.error("Chart loading error.")
     elif st.session_state.tarama_yapildi:
         st.markdown("<br><br>", unsafe_allow_html=True)
-        st.warning("⚠️️ No stocks matched your criteria. Please loosen your filters and try again.")
+        st.warning("⚠️ No stocks matched your criteria. Please loosen your filters and try again.")
         col_center = st.columns([4, 2, 4])
         with col_center[1]:
             st.button("⬅️ Back to Market", on_click=ana_ekrana_don, use_container_width=True)
