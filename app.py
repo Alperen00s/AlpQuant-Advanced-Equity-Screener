@@ -195,22 +195,27 @@ def generate_pdf_file(hisse, veri_dict):
         
     return pdf_bytes
 
-# --- 3. LİSTELER VE SÖZLÜKLER ---
-bist_30 = ["AKBNK", "ALARK", "ARCLK", "ASELS", "ASTOR", "BIMAS", "DOAS", "EKGYO", "ENKAI", "EREGL", "FROTO", "GARAN", "GUBRF", "HEKTS", "ISCTR", "KCHOL", "KOZAA", "KOZAL", "KRDMD", "ODAS", "PETKM", "PGSUS", "SAHOL", "SASA", "SISE", "TCELL", "THYAO", "TOASO", "TUPRS", "YKBNK"]
+# --- 3. LİSTELER VE SÖZLÜKLER (GÜNCEL BIST VERİ SETİ) ---
+bist_30 = [
+    "AKBNK", "ALARK", "ASELS", "ASTOR", "BEKO", "BIMAS", "CCOLA", "DOAS", "EKGYO", "ENJSA", 
+    "ENKAI", "EREGL", "FROTO", "GARAN", "ISCTR", "KCHOL", "KONTR", "KOZAL", "KRDMD", "MGROS", 
+    "PGSUS", "SAHOL", "SASA", "SISE", "TCELL", "THYAO", "TOASO", "TTKOM", "TUPRS", "YKBNK"
+]
+
 bankalar = ["AKBNK", "GARAN", "YKBNK", "ISCTR", "ALBRK", "VAKBN", "HALKB", "TSKB", "SKBNK"]
 holdingler = ["KCHOL", "SAHOL", "AGHOL", "ALARK", "DOHOL", "TKFEN", "ENKAI", "GOHOL"]
 otomotiv = ["FROTO", "TOASO", "DOAS", "TTRAK", "ASUZU", "KARSAN", "TMSN"]
 ulastirma_havacilik = ["THYAO", "PGSUS", "TAVHL", "CLEBI"]
-enerji = ["TUPRS", "ENJSA", "GWIND", "GESAN", "SMRTG", "CWENE", "NATEN", "MAGEN", "KARYE", "ZOREN", "ODAS", "CANTE", "ASTOR", "EUPWR", "ALFAS"]
+enerji = ["TUPRS", "ENJSA", "GWIND", "GESAN", "SMRTG", "CWENE", "NATEN", "MAGEN", "KARYE", "ZOREN", "AKENR", "ASTOR", "EUPWR", "ALFAS"]
 perakende_ticaret = ["BIMAS", "SOKM", "MGROS", "MAVI", "BIZIM", "VAKKO", "TKNSA"]
-teknoloji_bilisim = ["LOGO", "MIATK", "ARDYZ", "VBTYZ", "MOBTL", "PAPIL", "FONET", "KFEIN", "LINK", "ASELS", "KONTR"]
-gida_tarim = ["HEKTS", "GUBRF", "TATGD", "TUKAS", "YYLGD", "ELITE", "FADEL", "ULKER", "AEFES", "CCOLA", "PNLSN"]
-demir_celik_maden = ["EREGL", "KRDMD", "KCAER", "BRSAN", "KOZAA", "KOZAL", "KMPUR", "CEMAS"]
+teknoloji_bilisim = ["LOGO", "MIATK", "ARDYZ", "VBTYZ", "MOBTL", "PAPIL", "FONET", "KFEIN", "LINK", "ASELS", "KONTR", "SDTTR", "YEOTK"]
+gida_tarim = ["ULKER", "CCOLA", "AEFES", "TATGD", "TUKAS", "YYLGD", "ELITE", "FADEL", "PNLSN", "PETUN"]
+demir_celik_maden = ["EREGL", "KRDMD", "KCAER", "BRSAN", "KOZAL", "CVKMD", "KMPUR", "CEMAS"]
 cimento_insaat = ["CIMSA", "AKCNS", "BUCIM", "OYAKC", "NUHCM", "KLSER", "KAYSE"]
 kimya_plastik_ilac = ["SASA", "PETKM", "AKSA", "DEVA", "TRILC", "GENIL", "RTALB"]
-gyolar = ["EKGYO", "SRVGY", "ISGYO", "AKFGY", "TSGYO", "PAGYO", "DMLKT", "TRGYO", "HLGYO", "VKGYO", "ZGYO", "OZKGY", "KZBGY"]
+gyolar = ["EKGYO", "SRVGY", "ISGYO", "AKFGY", "TSGYO", "PAGYO", "TRGYO", "HLGYO", "VKGYO", "OZKGY", "KZBGY"]
 sigorta_araci_kurumlar = ["AKGRT", "ANSGR", "TURSG", "ISMEN", "INFO", "OSMEN"]
-dayanikli_tuketim = ["ARCLK", "VESBE", "VESTL"]
+dayanikli_tuketim = ["BEKO", "VESBE", "VESTL"]
 telekom = ["TCELL", "TTKOM"]
 
 sektor_sozlugu = {
@@ -220,11 +225,23 @@ sektor_sozlugu = {
     "Construction": cimento_insaat, "Chemicals & Pharma": kimya_plastik_ilac, "Real Estate (REIT)": gyolar,
     "Insurance & Brokerage": sigorta_araci_kurumlar, "Durables": dayanikli_tuketim, "Telecommunications": telekom
 }
+
 bist_100_ham = []
 for liste in sektor_sozlugu.values(): bist_100_ham.extend(liste)
 bist_100 = list(set(bist_100_ham + bist_30))
 
-katilim_tum = list(set(["BIMAS", "THYAO", "ASELS", "FROTO", "TUPRS", "DOAS", "ENJSA", "ALBRK", "OYAKC", "EREGL", "ASTOR", "GESAN", "MIATK", "CWENE", "EUPWR", "ALFAS", "KCAER", "BRSAN", "CIMSA", "ARCLK", "LOGO", "SOKM", "HEKTS", "GWIND", "YUNSA", "TTRAK", "YEOTK", "SDTTR", "CVKMD", "KORDS", "KTLEV", "ALTNY", "SRVGY", "LKMNH", "DMLKT", "KAYSE", "FMIZP", "BRYAT", "BRLSM", "BUCIM", "TUKAS", "TATGD", "ARDYZ", "MOBTL", "VBTYZ", "BIZIM", "FADEL", "ELITE", "RTALB", "TRILC", "GENIL", "DEVA", "SASA", "GUBRF", "VAKFN", "KZBGY", "KLNMA", "INFO", "OSMEN", "TRGYO", "HLGYO", "VKGYO", "KMPUR", "SUWEN", "MTRKS", "PCILT", "KARYE", "NATEN", "MAGEN", "ESEN", "AGROT", "REEDR", "EBEBK", "OBAMS"]))
+katilim_30 = [
+    "BIMAS", "THYAO", "ASELS", "FROTO", "TUPRS", "DOAS", "ENJSA", "ALBRK", "OYAKC", "EREGL", 
+    "ASTOR", "MIATK", "CWENE", "EUPWR", "ALFAS", "KCAER", "BRSAN", "CIMSA", "BEKO", "LOGO", 
+    "SOKM", "GWIND", "TTRAK", "YEOTK", "SDTTR", "CVKMD", "KORDS", "KLSER", "GESAN"
+]
+
+katilim_tum = list(set(katilim_30 + [
+    "KTLEV", "ALTNY", "SRVGY", "LKMNH", "DMLKT", "KAYSE", "FMIZP", "BRYAT", "BRLSM", "BUCIM", 
+    "TUKAS", "TATGD", "ARDYZ", "MOBTL", "VBTYZ", "BIZIM", "FADEL", "ELITE", "TRILC", "GENIL", 
+    "DEVA", "VAKFN", "KZBGY", "KLNMA", "INFO", "OSMEN", "TRGYO", "HLGYO", "VKGYO", "KMPUR", 
+    "SUWEN", "MTRKS", "PCILT", "KARYE", "NATEN", "MAGEN", "ESEN", "AGROT", "REEDR", "EBEBK", "OBAMS"
+]))
 
 # --- 4. PROFESYONEL SOL MENÜ ---
 st.sidebar.markdown("<h3 style='text-align: center; color: #FFFFFF;'>Filters & Options</h3>", unsafe_allow_html=True)
