@@ -61,7 +61,7 @@ if st.session_state.menu_kapat:
     """, unsafe_allow_html=True)
     st.session_state.menu_kapat = False
 
-# --- 2. PDF ÜRETİM FONKSİYONU (GRAFİKLER YAHOO'DAN, SORUNSUZ) ---
+# --- 2. PDF ÜRETİM FONKSİYONU ---
 def generate_pdf_file(hisse, veri_dict):
     pdf = FPDF()
     pdf.add_page()
@@ -261,19 +261,23 @@ st.sidebar.markdown("""
     </div>
 """, unsafe_allow_html=True) 
 
-# --- 5. YENİ VERİ MOTORU: TRADINGVIEW API (IŞIK HIZINDA, SIFIR BAN) ---
+# --- 5. YENİ VERİ MOTORU (SÜTUN İSİMLERİ DÜZELTİLDİ) ---
 def verileri_hazirla_paralel(hisseler):
     if not hisseler: return pd.DataFrame()
     
     st.toast("⚡ TradingView Kurumsal API'sine bağlanılıyor...", icon="🔌")
     
     url = "https://scanner.tradingview.com/turkey/scan"
+    # Sütun İsimlerinde Shotgun (Geniş Ağ) Algoritması
     payload = {
         "symbols": {"query": {"types": ["stock"]}},
         "columns": [
-            "name", "close", "price_earnings_ttm", "price_book_ratio", 
-            "ReturnOnEquityTTM", "dividend_yield_recent", "beta_1_year", 
-            "RSI", "MACD.macd", "MACD.signal", "SMA50", "SMA200", "BB.upper", "BB.lower"
+            "name", "close", "price_earnings_ttm", "price_book_fq", 
+            "return_on_equity_ttm", "return_on_equity_fq", 
+            "dividend_yield_recent", "dividend_yield_forward", 
+            "price_earnings_growth_ttm", "peg_ratio_ttm",
+            "beta_1_year", "RSI", "MACD.macd", "MACD.signal", 
+            "SMA50", "SMA200", "BB.upper", "BB.lower"
         ]
     }
     
@@ -290,56 +294,70 @@ def verileri_hazirla_paralel(hisseler):
         tv_dict[ticker] = item["d"]
         
     hesaplanan_veriler = []
+    progress_bar = st.progress(0)
+    toplam_hisse = len(hisseler)
     
-    def safe_val(val):
-        return round(float(val), 2) if val is not None else "N/A"
+    # Çoklu sütunlardan ilk dolu olanı çeken güvenlik fonksiyonu
+    def get_best(d, indices):
+        for idx in indices:
+            if idx < len(d) and d[idx] is not None:
+                return round(float(d[idx]), 2)
+        return "N/A"
 
-    for hisse in hisseler:
+    for i, hisse in enumerate(hisseler):
         if hisse not in tv_dict:
             continue
             
         d = tv_dict[hisse]
-        # TradingView Sütun Haritası
-        # 0:name, 1:close, 2:P/E, 3:P/B, 4:ROE, 5:DivYield, 6:Beta, 7:RSI, 8:MACD, 9:MACD.Signal, 10:SMA50, 11:SMA200, 12:BB.upper, 13:BB.lower
         
         grup = "Other"
         for sek_isim, sek_list in sektor_sozlugu.items():
             if hisse in sek_list: grup = sek_isim; break
 
-        # MACD ve Trend Hesaplamaları
-        macd_val, signal_val = d[8], d[9]
+        # MACD
+        macd_val, signal_val = d[12], d[13]
         macd_sinyal = "N/A"
         if macd_val is not None and signal_val is not None:
             macd_sinyal = "🟢 Bull" if macd_val > signal_val else "🔴 Bear"
             
-        sma50_val, sma200_val = d[10], d[11]
+        # Trend
+        sma50_val, sma200_val = d[14], d[15]
         trend_durumu = "N/A"
         if sma50_val is not None and sma200_val is not None:
             trend_durumu = "🚀 Up" if sma50_val > sma200_val else "📉 Down"
             
-        bb_upper, bb_lower, close_price = d[12], d[13], d[1]
+        # Bollinger
+        bb_upper, bb_lower, close_price = d[16], d[17], d[1]
         bb_genislik = "N/A"
         if bb_upper is not None and bb_lower is not None and close_price is not None and close_price > 0:
             bb_genislik = round(((bb_upper - bb_lower) / close_price) * 100, 2)
             
+        # Temettü yoksa N/A değil, "0.0" bas ki filtreler doğru çalışsın
+        div_val = get_best(d, [6, 7])
+        if div_val == "N/A": 
+            div_val = 0.0
+            
         hesaplanan_veriler.append({
             "Ticker": hisse,
             "Sector": grup,
-            "Price": safe_val(d[1]),
-            "P/E": safe_val(d[2]),
-            "P/B": safe_val(d[3]),
-            "PEG": "N/A", # TV ücretsiz API'sinde PEG yok, filtreden her zaman geçer.
-            "ROE%": safe_val(d[4]),
-            "Div Yield%": safe_val(d[5]),
-            "Beta": safe_val(d[6]),
-            "RSI": safe_val(d[7]),
+            "Price": get_best(d, [1]),
+            "P/E": get_best(d, [2]),
+            "P/B": get_best(d, [3]),
+            "ROE%": get_best(d, [4, 5]), # TTM ve FQ taraması
+            "Div Yield%": div_val,       # Temettü verisi
+            "PEG": get_best(d, [8, 9]),  # PEG Taraması
+            "Beta": get_best(d, [10]),
+            "RSI": get_best(d, [11]),
             "BBW%": bb_genislik,
             "MACD": macd_sinyal, 
             "Trend": trend_durumu, 
-            "SMA50": safe_val(d[10]), 
-            "SMA200": safe_val(d[11])
+            "SMA50": get_best(d, [14]), 
+            "SMA200": get_best(d, [15])
         })
         
+        progress_bar.progress((i + 1) / toplam_hisse)
+        
+    progress_bar.empty()
     return pd.DataFrame(hesaplanan_veriler)
 
 # --- 6. ANA EKRAN AKIŞI ---
@@ -393,7 +411,6 @@ if not st.session_state.tarama_yapildi:
     with st.spinner("Loading live market data..."):
         def safe_get_data(ticker):
             try:
-                # Grafikler için Yahoo'nun BANLANMAYAN .history servisi kullanılıyor.
                 df = yf.Ticker(ticker).history(period="6mo")
                 return df
             except:
@@ -478,7 +495,10 @@ else:
         c4.metric("Bullish MACD", f"{len(df_show[df_show['MACD'] == '🟢 Bull'])}")
         
         st.markdown("<hr>", unsafe_allow_html=True)
-        st.dataframe(df_show.drop(columns=["SMA50", "SMA200"]), use_container_width=True, hide_index=True)
+        
+        # SÜTUN GÖRÜNTÜSÜNÜ GÜZELLEŞTİRME: NaN değerleri temiz "N/A" metnine çeviriyoruz.
+        df_show_display = df_show.drop(columns=["SMA50", "SMA200"]).fillna("N/A")
+        st.dataframe(df_show_display, use_container_width=True, hide_index=True)
         
         st.markdown("<br><h4 style='color: #D1D4DC;'>Advanced Chart & Research</h4>", unsafe_allow_html=True)
         secilen_grafik_hissesi = st.selectbox("Select Ticker for Research", df_show["Ticker"].tolist())
