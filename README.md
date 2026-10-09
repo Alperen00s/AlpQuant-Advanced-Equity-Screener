@@ -15,7 +15,7 @@ AlpQuant is a professional-grade quantitative financial terminal tailored for th
 * **Islamic Finance Compliance:** Built-in exact filtering for the BIST Katılım 30 and Katılım All indexes, automatically excluding non-compliant equities and reflecting real-time index rebalancing.
 * **Automated PDF Tear Sheets:** Generate one-click, institutional-quality equity research reports featuring clean 2-column financial profiles, algorithmic price action charts, and a glossary of terms.
 * **Robust Data Architecture:** Utilizes parallel processing for rapid data scraping and isolated API requests to ensure terminal stability during data provider downtimes.
-
+"High-Frequency Screener Engine: Integrated directly with the TradingView Corporate API to scan and compute indicators for BIST equities in under 1 second, effectively bypassing traditional yfinance rate limits and delivering a lag-free, production-ready user experience." 
 ## 🛠️ Tech Stack
 * **Language:** Python
 * **Frontend UI:** Streamlit
